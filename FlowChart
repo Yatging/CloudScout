@@ -1,0 +1,88 @@
++-------------------+
+|      Start        |
++-------------------+
+          |
+          v
++-------------------+
+| Initialize:       |
+| - Serial (9600)   |
+| - DHT sensor      |
+| - Pins (inputs,   |
+|   outputs)        |
+| - Servo (90 deg)  |
+| - LED strip       |
+| - Play init anim  |
++-------------------+
+          |
+          v
++-------------------+
+| Read touch sensor |
+| (TOUCH_SENSOR_PIN)|
++-------------------+
+          |
+          v
++-------------------+
+| Touch detected?   |
+| (HIGH)            |
++-------------------+
+    Yes     | No
+    |        v
+    v       [Loop back to read touch sensor]
++-------------------+
+| Toggle mode:      |
+| detectionMode =   |
+| !detectionMode    |
+| Play switch sound |
+| Delay 500ms       |
++-------------------+
+          |
+          v
++-------------------+
+| Mode check:       |
+| detectionMode?    |
++-------------------+
+    Yes     | No
+    |        v
+    v       +-------------------+
++-----------+ Home Mode:        |
+| Alien Detection Mode:         |
+| - Read temp (DHT11)           |
+| - Read sound (LM393)          |
+| - If temp > 50°C: Red LED,    |
+|   servo moves                 |
+| - Else if temp < 10°C: Blue   |
+|   LED, servo moves            |
+| - Else if sound > 600: Purple |
+|   LED, servo moves            |
+| - Else: Green LED, servo moves|
++-----------+                   |
+            |                   |
+            v                   v
++-------------------+  +-------------------+
+| Read sensors:     |  | Read sensors:     |
+| - Temp (DHT11)    |  | - Temp (DHT11)    |
+| - Humidity (DHT11)|  | - Humidity (DHT11)|
+| - Sound (LM393)   |  | - Sound (LM393)   |
+| - Distance (HC-SR04)|  | - Distance (HC-SR04)|
++-------------------+  +-------------------+
+            |                   |
+            v                   v
++-------------------+  +-------------------+
+| Display data:     |  | Set LED color:    |
+| - Print temp, hum,|  | - Hum < 30: Yellow|
+|   sound, distance |  | - Hum > 70: Blue  |
+| - Show temp digit |  | - Temp > 30: Red  |
+| - Show hum digit  |  | - Temp < 10: Purple|
+|                   |  | - Else: Green     |
++-------------------+  +-------------------+
+            |                   |
+            v                   v
++-------------------+  +-------------------+
+| Delay 1000ms      |  | Delay 1000ms      |
++-------------------+  +-------------------+
+            |                   |
+            v                   v
++-------------------+  +-------------------+
+| Loop back to      |  | Loop back to      |
+| read touch sensor |  | read touch sensor |
++-------------------+  +-------------------+
