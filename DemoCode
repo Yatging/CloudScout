@@ -1,0 +1,231 @@
+#include <Servo.h>
+#include <Wire.h>
+#include <DHT.h>
+#include <Adafruit_NeoPixel.h>
+
+// Pin definitions for sensors and components
+#define SOUND_SENSOR_PIN A0  // Sound sensor connected to A0 port
+#define DHTPIN 2
+#define DHTTYPE DHT11
+#define BUZZER_PIN 6
+#define LED_PIN 3
+#define NUM_LEDS 64   // Total LEDs in 8x8 matrix
+#define SERVO1_PIN 10
+#define TRIG_PIN 7
+#define ECHO_PIN 8
+#define TOUCH_SENSOR_PIN 4   // Touch sensor pin
+
+DHT dht(DHTPIN, DHTTYPE);
+Servo antennaServo;
+Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
+
+bool detectionMode = false;  // false = Home Mode, true = Alien Detection Mode
+
+// Define 8x8 pixel patterns for digits 0 to 9
+byte digit[10][8] = {
+  { B11111100, B10000100, B10000100, B10000100, B10000100, B10000100, B10000100, B11111100 }, // 0
+  { B00011000, B00111000, B00011000, B00011000, B00011000, B00011000, B00011000, B11111100 }, // 1
+  { B11111100, B10000100, B00000100, B00000100, B00011100, B10000000, B10000000, B11111100 }, // 2
+  { B11111100, B10000100, B00000100, B00011100, B00000100, B10000100, B10000100, B11111100 }, // 3
+  { B10000100, B10000100, B10000100, B11111100, B00000100, B00000100, B00000100, B00000100 }, // 4
+  { B11111100, B10000000, B10000000, B11111100, B00000100, B00000100, B10000100, B11111100 }, // 5
+  { B11111100, B10000000, B10000000, B11111100, B10000100, B10000100, B10000100, B11111100 }, // 6
+  { B11111100, B10000100, B00000100, B00000100, B00000100, B00000100, B00000100, B00000100 }, // 7
+  { B11111100, B10000100, B10000100, B11111100, B10000100, B10000100, B10000100, B11111100 }, // 8
+  { B11111100, B10000100, B10000100, B11111100, B00000100, B00000100, B10000100, B11111100 }  // 9 (Fixed syntax)
+};
+
+void setup() {
+    Serial.begin(9600);
+    dht.begin();
+    pinMode(BUZZER_PIN, OUTPUT);
+    pinMode(TRIG_PIN, OUTPUT);
+    pinMode(ECHO_PIN, INPUT);
+    pinMode(SOUND_SENSOR_PIN, INPUT);  // Initialize sound sensor
+    pinMode(TOUCH_SENSOR_PIN, INPUT);  // Initialize touch sensor
+    antennaServo.attach(SERVO1_PIN);
+    antennaServo.write(90);
+    strip.begin();
+    strip.show();
+    initAnimation();
+}
+
+void loop() {
+    if (digitalRead(TOUCH_SENSOR_PIN) == HIGH) {  // Mode switch: Press touch sensor
+        detectionMode = !detectionMode;
+        playSwitchModeSound(detectionMode);
+        delay(500); // Prevent false triggers
+    }
+
+    if (detectionMode) {
+        alienDetectionMode();  // Alien Detection Mode
+    } else {
+        homeMode();  // Home Mode
+    }
+    delay(1000);
+}
+
+// Home Mode: Monitor environment and display data
+void homeMode() {
+    float temp = dht.readTemperature();
+    float humidity = dht.readHumidity();
+    int soundLevel = analogRead(SOUND_SENSOR_PIN);
+    long distance = getDistance();
+
+    // Display temperature, humidity, sound level, and distance on Serial Monitor
+    Serial.print("Temperature: "); Serial.println(temp);
+    Serial.print("Humidity: "); Serial.println(humidity);
+    Serial.print("Sound Level: "); Serial.println(soundLevel);
+    Serial.print("Distance: "); Serial.println(distance);
+
+    // Set LED color or animation based on conditions
+    if (humidity < 30) {
+        waterDropAnimation();  // Low humidity: Water drop animation
+    } else if (humidity > 70) {
+        setLED(0, 0, 255);  // High humidity: Blue
+    } else if (temp > 30) {
+        setLED(255, 0, 0);  // High temperature: Red
+    } else if (temp < 10) {
+        snowflakeStatic();  // Low temperature: Snowflake animation
+    } else {
+        setLED(0, 255, 0);  // Normal: Green
+    }
+
+    showDigit(int(temp));  // Display temperature as a digit
+    showDigit(int(humidity));  // Display humidity as a digit
+}
+
+// Alien Detection Mode: Speculative scanning for extraterrestrial signals
+void alienDetectionMode() {
+    float temp = dht.readTemperature();
+    int soundLevel = analogRead(SOUND_SENSOR_PIN);
+    
+    if (temp > 50) {
+        setLED(255, 0, 0);  // Silicon-based life: Red
+    } else if (temp < 10) {
+        setLED(0, 0, 255);  // Ammonia-based life: Blue
+    } else if (soundLevel > 600) {
+        setLED(128, 0, 128);  // Digital life: Purple
+    } else {
+        setLED(0, 255, 0);  // Carbon-based life: Green
+    }
+
+    moveAntenna();  // Move antenna
+}
+
+// Display a digit on the 8x8 LED matrix
+void showDigit(int num) {
+    for (int i = 0; i < 8; i++) {
+        byte pixel = digit[num][i];
+        for (int j = 0; j < 8; j++) {
+            if (bitRead(pixel, j)) {
+                strip.setPixelColor(i * 8 + j, strip.Color(255, 255, 0));  // Yellow pixel
+            } else {
+                strip.setPixelColor(i * 8 + j, strip.Color(0, 0, 0));  // Pixel off
+            }
+        }
+    }
+    strip.show();
+}
+
+// Set LED color for the entire matrix
+void setLED(int r, int g, int b) {
+    for (int i = 0; i < NUM_LEDS; i++) {
+        strip.setPixelColor(i, strip.Color(r, g, b));
+    }
+    strip.show();
+}
+
+// Play buzzer sound for mode switching
+void playSwitchModeSound(bool toDetectionMode) {
+    if (toDetectionMode) {
+        tone(BUZZER_PIN, 500, 200); delay(250);
+        tone(BUZZER_PIN, 800, 200); delay(250);
+        tone(BUZZER_PIN, 1200, 300);
+    } else {
+        tone(BUZZER_PIN, 1200, 200); delay(250);
+        tone(BUZZER_PIN, 800, 200); delay(250);
+        tone(BUZZER_PIN, 500, 300);
+    }
+}
+
+// Placeholder: Initialize animation (to be implemented)
+void initAnimation() {
+    // Example: Flash LEDs in a pattern
+    for (int i = 0; i < NUM_LEDS; i++) {
+        strip.setPixelColor(i, strip.Color(0, 255, 0));
+        strip.show();
+        delay(50);
+    }
+    for (int i = 0; i < NUM_LEDS; i++) {
+        strip.setPixelColor(i, strip.Color(0, 0, 0));
+        strip.show();
+        delay(50);
+    }
+}
+
+// Get distance from ultrasonic sensor
+long getDistance() {
+    digitalWrite(TRIG_PIN, LOW);
+    delayMicroseconds(2);
+    digitalWrite(TRIG_PIN, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(TRIG_PIN, LOW);
+    
+    long duration = pulseIn(ECHO_PIN, HIGH);
+    long distance = duration * 0.034 / 2;  // Convert to centimeters
+    return distance;
+}
+
+// Move antenna servo
+void moveAntenna() {
+    for (int pos = 70; pos <= 110; pos += 5) {
+        antennaServo.write(pos);
+        delay(100);
+    }
+    for (int pos = 110; pos >= 70; pos -= 5) {
+        antennaServo.write(pos);
+        delay(100);
+    }
+}
+
+void waterDropAnimation() {
+    for (int i = 0; i < 8; i++) {
+        strip.clear();
+        strip.setPixelColor(i * 8 + 3, strip.Color(0, 0, 255));
+        strip.setPixelColor(i * 8 + 4, strip.Color(0, 0, 255));
+        strip.show();
+        delay(200);
+    }
+    strip.clear();
+    strip.show();
+}
+
+void snowflakeStatic() {
+    strip.clear();
+    const uint8_t snowflake[64] = {
+        0,1,0,0,0,0,1,0,
+        1,0,0,1,1,0,0,1,
+        0,0,1,0,0,1,0,0,
+        0,1,0,0,0,0,1,0,
+        0,1,0,0,0,0,1,0,
+        0,0,1,0,0,1,0,0,
+        1,0,0,1,1,0,0,1,
+        0,1,0,0,0,0,1,0
+    };
+
+    for (int i = 0; i < 64; i++) {
+        if (snowflake[i] == 1) {
+            // Base light blue RGB(173, 216, 230), add slight random variation
+            uint8_t r = 173 + random(-20, 20); // 153-193
+            uint8_t g = 216 + random(-20, 20); // 196-236
+            uint8_t b = 230 + random(-20, 20); // 210-250
+            // Constrain values to avoid overflow
+            r = constrain(r, 0, 255);
+            g = constrain(g, 0, 255);
+            b = constrain(b, 0, 255);
+            strip.setPixelColor(i, strip.Color(r, g, b));
+        }
+    }
+    strip.show();
+}
